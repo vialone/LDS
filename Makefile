@@ -1,16 +1,16 @@
 .DEFAULT_GOAL = all
 
 all:
-    echo "Command not specified. Exiting..."
-    exit 1
+	echo "Command not specified. Exiting..."
+	exit 1
 
 config-kernel:
-    ./make.sh kconfig
+	./make.sh kconfig
 
 download-kernel:
-    ./make.sh download-kernel
+	./make.sh download-kernel
 
-kernel:
+build-kernel:
 	./make.sh build-kernel
 
 initramfs:

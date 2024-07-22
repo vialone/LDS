@@ -1,0 +1,12 @@
+#!/bin/env python3
+
+
+with open("/etc/os-release", "rt") as f:
+	data = f.read().lower()
+
+if "mint" in data or "debian" in data or "ubuntu" in data:
+	print("deb")
+elif "arch" in data or "arco" in data or "manjaro" in data:
+	print("arch")
+else:
+	print("unknown")

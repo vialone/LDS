@@ -2,77 +2,102 @@
 
 set -e
 
-source config.sh
-
+DEBUG_MODE=false
 WORKDIR=$PWD
 PROCNUM=$(expr $(nproc) - 1)
-ALL_INITRAMFS_FILES=$(find initrd)
+
+run() {
+    if $DEBUG_MODE; then
+        printf "[DEBUG] "
+        printf "$PWD "
+        echo "$@"
+    fi
+    $@
+}
+
+DISTRO=$(./getdistroname)
+
+case $DISTRO in
+    "debian")
+        OVMF=/usr/share/ovmf/OVMF.fd
+        ;;
+    "arch")
+        OVMF=/usr/share/ovmf/x64/OVMF.fd
+        ;;
+    *)
+        OVMF=/usr/share/ovmf/OVMF.fd
+        ;;
+esac
+
+source config.sh
 
 download_kernel() {
-    wget https://cdn.kernel.org/pub/kernel/kernel/v$KERNEL_VERSION_MASK/kernel-$KERNEL_VERSION.tar.xz
-    tar xf kernel-$KERNEL_VERSION.tar.xz
-    mv kernel-$KERNEL_VERSION kernel
-    rm kernel-$KERNEL_VERSION.tar.xz
+    run wget https://cdn.kernel.org/pub/linux/kernel/v$KERNEL_VERSION_MASK/linux-$KERNEL_VERSION.tar.xz
+    run tar xf linux-$KERNEL_VERSION.tar.xz
+    run mv linux-$KERNEL_VERSION kernel
+    run rm linux-$KERNEL_VERSION.tar.xz
 }
 
 build_kernel() {
     if [ ! -d kernel ]; then
         download_kernel
     fi
-    cd kernel
-    make -j$PROCNUM --silent
-    cd ..
-    cp kernel/arch/x86/boot/bzImage vmlinuz
+    run cd kernel
+    run make -j$PROCNUM # --silent
+    run cd ..
+    run cp kernel/arch/x86/boot/bzImage vmlinuz
 }
 
 build_initramfs() {
-    mkdir -p /tmp/lds/initrd
-    cp -r initrd /tmp/lds/initrd
-    cd /tmp/lds/initrd/bin
+    run mkdir -p /tmp/lds/initrd/bin
+    run cp -rf initrd/* /tmp/lds/initrd
+    run cd /tmp/lds/initrd/bin
+    set +e
     for link in $($WORKDIR/busybox --list); do
-        cp -f /bin/$link $link > /dev/null 2>&1
+        run cp -f /bin/$link $link
     done
-    cd /tmp/lds
-    mksquashfs initrd $INITRAMFS -no-compression -noappend
-    cd $WORKDIR
+    set -e
+    run cd /tmp/lds
+    run mksquashfs initrd $INITRAMFS -no-strip -all-root -no-hardlinks -no-recovery
+    run cd $WORKDIR
 }
 
 build_grub() {
-    if [ -d disk ]; then rm -rf disk; fi
-    mkdir -p disk/boot/grub
-    mkdir -p disk/lhex
-    cp $GRUB_CONFIG disk/boot/grub/
-    cp vmlinuz disk/lhex/vmlinuz
-    cp $INITRAMFS disk/lhex/initramfs.img
+    if [ -d disk ]; then run rm -rf disk; fi
+    run mkdir -p disk/boot/grub
+    run mkdir -p disk/lhex
+    run cp $GRUB_CONFIG disk/boot/grub/
+    run cp vmlinuz disk/lhex/vmlinuz
+    run cp $INITRAMFS disk/lhex/initramfs.img
     # printf "" > disk/boot/2024-07-00-00-00-00-00.uuid
-    grub-mkrescue disk -o disk.iso
-    rm -rf disk
+    run grub-mkrescue disk -o disk.iso
+    run rm -rf disk
 }
 
 test_grub() {
-    qemu-system-x86_64 -enable-kvm -vga virtio -m 8G \
+    run qemu-system-x86_64 -enable-kvm -vga virtio -m 8G \
 		-vga virtio -drive file=disk.iso,if=virtio,format=raw \
 		-smp 12 -cpu host -enable-kvm -rtc base=localtime \
-		-bios /usr/share/ovmf/x64/OVMF.fd -no-reboot -serial stdio \
+		-bios $OVMF -no-reboot -serial stdio \
 		2> /dev/null
 }
 
 config_kernel() {
     local 
-    cd kernel
+    run cd kernel
     case $KERNEL_CONFIG in
         "gtk")
-            make gconfig
+            run make gconfig
             ;;
         "ncurses")
-            make menuconfig
+            run make menuconfig
             ;;
         *)
             echo "Invalid \$KERNEL_CONFIG, defaulting to \`ncurses\`"
-            make menuconfig
+            run make menuconfig
             ;;
     esac
-    cd $WORKDIR
+    run cd $WORKDIR
 }
 
 if [ $# -eq 0 ]; then
