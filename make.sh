@@ -65,17 +65,18 @@ build_initramfs() {
 build_grub() {
     if [ -d disk ]; then run rm -rf disk; fi
     run mkdir -p disk/boot/grub
-    run mkdir -p disk/lhex
+    run mkdir -p disk
     run cp $GRUB_CONFIG disk/boot/grub/
-    run cp vmlinuz disk/lhex/vmlinuz
-    run cp $INITRAMFS disk/lhex/initramfs.img
-    # printf "" > disk/boot/2024-07-00-00-00-00-00.uuid
-    run grub-mkrescue disk -o disk.iso
+    run cp vmlinuz disk/
+    run cp $INITRAMFS disk/
+    run cd disk
+    run grub-mkrescue ./* -o ../disk.iso
+    run cd ..
     run rm -rf disk
 }
 
 test_grub() {
-    run qemu-system-x86_64 -enable-kvm -vga virtio -m 8G \
+    run qemu-system-x86_64 -enable-kvm -m 8G \
 		-vga virtio -drive file=disk.iso,if=virtio,format=raw \
 		-smp 12 -cpu host -enable-kvm -rtc base=localtime \
 		-bios $OVMF -no-reboot -serial stdio \
