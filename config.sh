@@ -1,0 +1,4 @@
+KERNEL_VERSION=6.9.10
+BUSYBOX_VERSION=1.35.0-x86_64-linux-musl
+INITRAMFS=$PWD/initramfs.img
+GRUB_CONFIG=$PWD/grub.cfg
