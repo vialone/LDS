@@ -9,7 +9,7 @@ PROCNUM=$(expr $(nproc) - 1)
 ALL_INITRAMFS_FILES=$(find initrd)
 
 download_kernel() {
-    wget https://cdn.kernel.org/pub/kernel/kernel/v6.x/kernel-$KERNEL_VERSION.tar.xz
+    wget https://cdn.kernel.org/pub/kernel/kernel/v$KERNEL_VERSION_MASK/kernel-$KERNEL_VERSION.tar.xz
     tar xf kernel-$KERNEL_VERSION.tar.xz
     mv kernel-$KERNEL_VERSION kernel
     rm kernel-$KERNEL_VERSION.tar.xz
@@ -57,6 +57,24 @@ test_grub() {
 		2> /dev/null
 }
 
+config_kernel() {
+    local 
+    cd kernel
+    case $KERNEL_CONFIG in
+        "gtk")
+            make gconfig
+            ;;
+        "ncurses")
+            make menuconfig
+            ;;
+        *)
+            echo "Invalid \$KERNEL_CONFIG, defaulting to \`ncurses\`"
+            make menuconfig
+            ;;
+    esac
+    cd $WORKDIR
+}
+
 if [ $# -eq 0 ]; then
     echo "Command not provided"
     exit 1
@@ -77,6 +95,9 @@ case $1 in
         ;;
     "test")
         test_grub
+        ;;
+    "kconfig")
+        config_kernel
         ;;
     *)
         echo "Unknown command"
