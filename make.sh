@@ -5,6 +5,8 @@ set -e
 DEBUG_MODE=false
 WORKDIR=$PWD
 PROCNUM=$(expr $(nproc) - 1)
+INITRDFS=cpio
+BUSYBOX=$WORKDIR/busybox
 
 run() {
     if $DEBUG_MODE; then
@@ -48,30 +50,56 @@ build_kernel() {
     run cp kernel/arch/x86/boot/bzImage vmlinuz
 }
 
-build_initramfs() {
+collect_initramfs() {
+    if [ -d /tmp/lds/initrd ]; then
+        rm -rf /tmp/lds/initrd
+    fi
     run mkdir -p /tmp/lds/initrd/bin
     run cp -rf initrd/* /tmp/lds/initrd
     run cd /tmp/lds/initrd/bin
-    set +e
-    for link in $($WORKDIR/busybox --list); do
-        run cp -f /bin/$link $link
+    cp $BUSYBOX .
+    for link in $(./busybox --list); do
+        run ln -s busybox $link
     done
-    set -e
-    run cd /tmp/lds
+    run cd $WORKDIR
+}
+
+build_initramfs_squashfs() {
+    collect_initramfs
+    cd /tmp/lds
     run mksquashfs initrd $INITRAMFS -no-strip -all-root -no-hardlinks -no-recovery
     run cd $WORKDIR
+}
+
+build_initramfs_cpio() {
+    collect_initramfs
+    cd /tmp/lds/initrd
+    find . | cpio -o -H newc > $INITRAMFS
+    run cd $WORKDIR
+}
+
+build_initramfs() {
+    case $INITRDFS in
+        "cpio")
+            build_initramfs_cpio
+            ;;
+        "squashfs")
+            build_initramfs_squashfs
+            ;;
+        *)
+            echo "Unknown FS type: $INITRDFS. defaulting to cpio"
+            build_initramfs_cpio
+            ;;
+    esac
 }
 
 build_grub() {
     if [ -d disk ]; then run rm -rf disk; fi
     run mkdir -p disk/boot/grub
-    run mkdir -p disk
-    run cp $GRUB_CONFIG disk/boot/grub/
-    run cp vmlinuz disk/
-    run cp $INITRAMFS disk/
-    run cd disk
-    run grub-mkrescue ./* -o ../disk.iso
-    run cd ..
+    run cp $GRUB_CONFIG disk/boot/grub/grub.cfg
+    run cp vmlinuz disk/boot/bzImage
+    run cp $INITRAMFS disk/boot/initrd
+    run grub-mkrescue disk -o disk.iso
     run rm -rf disk
 }
 
