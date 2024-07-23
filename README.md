@@ -9,8 +9,7 @@ To download kernel, run `make download-kernel`. It will download kernel version 
 Next, run `make config-kernel`. It will run gtk or ncurses kernel config, depends on your config.
 Next, run `make build-kernel`. It will build kernel accordingly to your config.
 
-`$WORKDIR/busybox` required to determine a list of binaries to copy from your host system. You can replace it
-with sth executable to customize this list.
+`$WORKDIR/busybox` is a coreutils replacement, you can replace it with sth you want that behaves like busybox
 
 `grub.cfg` is config for grub. Be careful, config file's basename will be used in ISO image as-is!
 
